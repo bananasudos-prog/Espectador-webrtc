@@ -1,19 +1,288 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Espectador Dragon Ball</title><style>*{box-sizing:border-box}body{margin:0;background:#080810;color:#fff;font:15px system-ui;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:14px;gap:10px}h2{margin:4px}p{margin:0;color:#d1d5db;text-align:center}input,button{font:inherit;border-radius:9px;padding:11px;border:1px solid #6d28d9}input{background:#171722;color:white;width:180px}button{background:#6d28d9;color:white;font-weight:800}#status{color:#c4b5fd;text-align:center;overflow-wrap:anywhere}video{width:100%;max-width:900px;max-height:75vh;background:#000;border:1px solid #6d28d9;border-radius:10px;object-fit:contain}small{color:#a1a1aa;text-align:center;max-width:650px}</style></head><body><h2>🐉 Modo Espectador</h2><p>Digite o código que aparece no celular do jogador.</p><div><input id="code" inputmode="numeric" maxlength="8" placeholder="Código da sala"><button id="connect" type="button" onclick="window.connectSpectator()">CONECTAR</button></div><div id="status">Aguardando código.</div><video id="video" autoplay playsinline controls></video><small>Teste inicial da transmissão da página. Se não conectar, pode ser necessário ajustar as regras do Firebase. A captura reduzida pode ficar menos fluida em celulares mais fracos.</small><script>
-// Fallback fora do módulo: se os imports falharem, o botão ainda explica o problema.
-window.connectSpectator = function () {
-  const status = document.getElementById('status');
-  const code = document.getElementById('code').value.trim();
-  if (!/^\d{8}$/.test(code)) {
-    status.textContent = 'Digite o código de 8 números.';
-    return;
-  }
-  status.textContent = 'O botão funciona, mas o módulo do Firebase não carregou. Recarregue o site e confira a conexão.';
-};
-</script>
+
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Espectador Dragon Ball</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080810;color:#fff;font:15px system-ui;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:14px;gap:10px}
+h2{margin:4px}
+p{margin:0;color:#d1d5db;text-align:center}
+input,button{font:inherit;border-radius:9px;padding:11px;border:1px solid #6d28d9}
+input{background:#171722;color:white;width:180px}
+button{background:#6d28d9;color:white;font-weight:800}
+#status{color:#c4b5fd;text-align:center;overflow-wrap:anywhere}
+video{width:100%;max-width:900px;max-height:75vh;background:#000;border:1px solid #6d28d9;border-radius:10px;object-fit:contain}
+small{color:#a1a1aa;text-align:center;max-width:650px}
+</style>
+</head>
+<body>
+<h2>🐉 Modo Espectador</h2>
+<p>Digite o código que aparece no celular do jogador.</p>
+
+<div>
+<input id="codigo" inputmode="numeric" maxlength="8" placeholder="Código da sala">
+<button id="conectar">CONECTAR</button>
+</div>
+
+<div id="status">Aguardando conexão...</div>
+<video id="video" autoplay playsinline controls></video>
+<small>O jogador precisa iniciar a transmissão no outro celular. Ambos os dispositivos precisam ter acesso à internet.</small>
+
 <script type="module">
-import {initializeApp,getApps,getApp} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';import{getAuth,signInAnonymously}from'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';import{getDatabase,ref,get,set,onValue,onChildAdded,remove,push}from'https://www.gstatic.com/firebasejs/13.1.0/firebase-database.js';
-const cfg={apiKey:"AIzaSyCMcfYloCw40K2lOmEfIGuDA8_f8dvbMGI",authDomain:"db-multiver-trainer.firebaseapp.com",databaseURL:"https://db-multiver-trainer-default-rtdb.firebaseio.com/",projectId:"db-multiver-trainer",storageBucket:"db-multiver-trainer.firebasestorage.app",messagingSenderId:"992695487773",appId:"1:992695487773:web:b64b903aaa553090afa5f4"};const $=id=>document.getElementById(id);let pc=null,offs=[];function msg(t){$('status').textContent=t}function clear(){offs.forEach(f=>{try{f()}catch{}});offs=[];if(pc){pc.close();pc=null} $('video').srcObject=null}
-window.connectSpectator=async()=>{clear();const code=$('code').value.trim();if(!/^\d{8}$/.test(code)){msg('Digite o código de 8 números.');return} $('connect').disabled=true;msg('1/4: Botão acionado. Iniciando Firebase…');try{const app=getApps().length?getApp():initializeApp(cfg);const auth=getAuth(app);if(!auth.currentUser){msg('2/4: Entrando anonimamente no Firebase… (aguarde até 12 s)');await Promise.race([signInAnonymously(auth),new Promise((_,reject)=>setTimeout(()=>reject(new Error('TEMPO ESGOTADO na autenticação anônima após 12 segundos. O Firebase Auth não respondeu.')),12000))])}msg('3/4: Buscando a sala '+code+'…');const db=getDatabase(app),rr=ref(db,'webrtcRooms/'+code),snap=await get(rr);if(!snap.exists()||!snap.val().offer){msg('Sala não encontrada. Confirme o código e tente novamente.');return}msg('4/4: Sala encontrada. Negociando vídeo…');pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});pc.ontrack=e=>{$('video').srcObject=e.streams[0];msg('Vídeo recebido! Estado: '+pc.connectionState)};pc.onconnectionstatechange=()=>{if(pc)msg('Conexão: '+pc.connectionState)};let pending=[];const stopRemote=onChildAdded(ref(db,'webrtcRooms/'+code+'/senderCandidates'),async s=>{const c=s.val();if(!c)return;try{if(pc.remoteDescription)await pc.addIceCandidate(new RTCIceCandidate(c));else pending.push(c)}catch(e){console.warn(e)}});offs.push(stopRemote);pc.onicecandidate=async e=>{if(e.candidate)await push(ref(db,'webrtcRooms/'+code+'/viewerCandidates'),e.candidate.toJSON())};await pc.setRemoteDescription(new RTCSessionDescription(snap.val().offer));for(const c of pending)await pc.addIceCandidate(new RTCIceCandidate(c));pending=[];const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await set(ref(db,'webrtcRooms/'+code+'/answer'),{type:ans.type,sdp:ans.sdp});msg('Oferta recebida; negociando vídeo…');}catch(e){msg('FALHA ['+(e.code||e.name||'erro')+']: '+(e.message||String(e)));console.error('Erro completo do Espectador:',e)}finally{$('connect').disabled=false}};
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth,
+  signInAnonymously
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getDatabase,
+  ref,
+  get,
+  set,
+  onValue,
+  update,
+  push
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCMcfYloCw40K2lOmEfIGuDA8_f8dvbMGI",
+  authDomain: "db-multiver-trainer.firebaseapp.com",
+  databaseURL: "https://db-multiver-trainer-default-rtdb.firebaseio.com/",
+  projectId: "db-multiver-trainer",
+  storageBucket: "db-multiver-trainer.firebasestorage.app",
+  messagingSenderId: "992695487773",
+  appId: "1:992695487773:web:b64b903aaa553090afa5f4"
+};
+
+const statusEl = document.getElementById("status");
+const video = document.getElementById("video");
+const botao = document.getElementById("conectar");
+const codigoInput = document.getElementById("codigo");
+
+let db;
+let pc;
+let salaAtual;
+let pararICE = null;
+let ocupado = false;
+
+function status(texto) {
+  statusEl.textContent = texto;
+}
+
+function esperar(promise, ms, descricao) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(
+        new Error("TEMPO ESGOTADO: " + descricao)
+      ), ms);
+    })
+  ]);
+}
+
+async function iniciarFirebase() {
+  status("Inicializando Firebase...");
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  db = getDatabase(app);
+
+  status("Autenticando no Firebase...");
+
+  await esperar(
+    signInAnonymously(auth),
+    12000,
+    "A autenticação anônima não respondeu em 12 segundos."
+  );
+
+  status("Firebase conectado. Digite o código da sala.");
+}
+
+function adicionarCandidato(caminho, candidato) {
+  if (!candidato || !pc) return;
+
+  pc.addIceCandidate(
+    new RTCIceCandidate(candidato)
+  ).catch(err => {
+    console.warn("Erro ao adicionar candidato ICE:", err);
+  });
+}
+
+async function conectar() {
+  if (ocupado) return;
+
+  ocupado = true;
+  botao.disabled = true;
+
+  try {
+    const codigo = codigoInput.value.trim();
+
+    if (!/^\d{8}$/.test(codigo)) {
+      throw new Error("Digite o código de 8 números da sala.");
+    }
+
+    if (!db) {
+      throw new Error("Firebase ainda não foi inicializado.");
+    }
+
+    salaAtual = codigo;
+
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
+
+    if (pararICE) {
+      pararICE();
+      pararICE = null;
+    }
+
+    video.srcObject = null;
+
+    const salaRef = ref(db, "webrtcRooms/" + codigo);
+
+    status("Procurando a sala " + codigo + "...");
+
+    const snapshot = await esperar(
+      get(salaRef),
+      12000,
+      "Não foi possível consultar a sala no banco."
+    );
+
+    if (!snapshot.exists()) {
+      throw new Error(
+        "Sala não encontrada. Confirme o código e se o transmissor criou a sala."
+      );
+    }
+
+    const sala = snapshot.val();
+
+    if (!sala.offer) {
+      throw new Error(
+        "A sala existe, mas ainda não contém a oferta WebRTC do transmissor."
+      );
+    }
+
+    pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" }
+      ]
+    });
+
+    pc.ontrack = event => {
+      if (event.streams && event.streams[0]) {
+        video.srcObject = event.streams[0];
+        video.play().catch(() => {});
+        status("🎉 Transmissão recebida!");
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (!pc) return;
+
+      const estado = pc.connectionState;
+      console.log("Estado WebRTC:", estado);
+
+      if (estado === "connected") {
+        status("🟢 Conectado à transmissão!");
+      } else if (estado === "connecting") {
+        status("Conectando os celulares...");
+      } else if (estado === "failed") {
+        status("Conexão falhou. A rede pode exigir um servidor TURN.");
+      } else if (estado === "disconnected") {
+        status("Conexão interrompida. Tentando recuperar...");
+      } else if (estado === "closed") {
+        status("Conexão encerrada.");
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE:", pc.iceConnectionState);
+    };
+
+    status("Recebendo oferta e preparando resposta...");
+
+    await pc.setRemoteDescription(
+      new RTCSessionDescription(sala.offer)
+    );
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    await esperar(
+      new Promise(resolve => {
+        if (pc.iceGatheringState === "complete") {
+          resolve();
+          return;
+        }
+
+        const verificar = () => {
+          if (pc && pc.iceGatheringState === "complete") {
+            pc.removeEventListener(
+              "icegatheringstatechange",
+              verificar
+            );
+            resolve();
+          }
+        };
+
+        pc.addEventListener(
+          "icegatheringstatechange",
+          verificar
+        );
+      }),
+      10000,
+      "A coleta de candidatos ICE demorou demais."
+    );
+
+    await set(
+      ref(db, "webrtcRooms/" + codigo + "/answer"),
+      pc.localDescription.toJSON()
+    );
+
+    const candidatosRef = ref(
+      db,
+      "webrtcRooms/" + codigo + "/callerCandidates"
+    );
+
+    pararICE = onValue(candidatosRef, snapshot => {
+      if (!snapshot.exists()) return;
+
+      snapshot.forEach(item => {
+        const candidato = item.val();
+
+        if (candidato) {
+          adicionarCandidato(candidatosRef, candidato);
+        }
+      });
+    });
+
+    status(
+      "Resposta enviada. Esperando a conexão com o transmissor..."
+    );
+
+  } catch (error) {
+    console.error(error);
+    status("FALHA: " + (error.message || String(error)));
+  } finally {
+    ocupado = false;
+    botao.disabled = false;
+  }
+}
+
+botao.addEventListener("click", conectar);
+
+codigoInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") conectar();
+});
+
+iniciarFirebase().catch(error => {
+  console.error(error);
+  status("FALHA: " + (error.message || String(error)));
+});
 </script>
 </body>
 </html>
